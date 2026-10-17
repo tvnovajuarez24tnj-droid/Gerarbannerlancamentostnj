@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>TV NOVA JUAREZ - Editor de Banner</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box;
+      font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+      -webkit-tap-highlight-color:transparent; }
+  body { background:linear-gradient(135deg,#0f0c29,#302b63,#24243e);
+         min-height:100vh; color:#fff; padding:10px; overflow-x:hidden; }
+  h1 { font-size:1.15rem; text-align:center; margin-bottom:10px;
+       background:linear-gradient(90deg,#ff0080,#ff8c00,#40e0d0);
+       -webkit-background-clip:text; background-clip:text; color:transparent;
+       letter-spacing:1px; }
+
+  .app { max-width:1400px; margin:auto; display:grid;
+         grid-template-columns:1fr 360px; gap:14px; }
+  @media(max-width:900px){ .app{grid-template-columns:1fr;} }
+
+  /* ============ PALCO ============ */
+  .stage-wrap { display:flex; flex-direction:column; align-items:center; }
+  .stage {
+    position:relative; overflow:hidden; border-radius:14px;
+    box-shadow:0 20px 60px rgba(255,0,128,.35);
+    background:#000; margin:auto;
+    background-image:
+      repeating-conic-gradient(#1a1a1a 0% 25%, #111 0% 50%);
+    background-size:20px 20px;
+  }
+  .stage.story   { width:300px; height:533px; }
+  .stage.square  { width:360px; height:360px; }
+  .stage.yt      { width:400px; height:225px; }
+  .stage.wide    { width:420px; height:180px; }
+  .stage.vertical{ width:320px; height:400px; }
+
+  #bannerBg { position:absolute; inset:0; width:100%; height:100%;
+              object-fit:cover; z-index:0; display:none; }
+  #bannerBg.show { display:block; }
+  #bannerOverlay { position:absolute; inset:0; z-index:1;
+    background:linear-gradient(180deg,rgba(0,0,0,.7),transparent 45%,
+    transparent 55%,rgba(0,0,0,.8)); pointer-events:none; display:none; }
+  #bannerBg.show ~ #bannerOverlay { display:block; }
+
+  /* ============ ELEMENTOS ============ */
+  .elem {
+    position:absolute; z-index:3; cursor:grab; user-select:none;
+    padding:4px; touch-action:none; transition:box-shadow .15s;
+  }
+  .elem:active { cursor:grabbing; }
+  .elem.selected {
+    outline:2px dashed #00ff9d; outline-offset:2px;
+    box-shadow:0 0 0 3px rgba(0,255,157,.25);
+  }
+  .elem .resize-handle {
+    position:absolute; right:-8px; bottom:-8px; width:18px; height:18px;
+    background:#00ff9d; border-radius:50%; cursor:nwse-resize;
+    display:none; z-index:10; border:2px solid #000;
+  }
+  .elem.selected .resize-handle { display:block; }
+
+  .elem-nome {
+    font-weight:900; text-transform:uppercase; letter-spacing:2px;
+    text-align:center; white-space:nowrap;
+    background:linear-gradient(90deg,#ff0080,#ff8c00,#ffe600,#00ff9d,#00b3ff,#ff0080);
+    background-size:300% 100%;
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    text-shadow:0 0 20px rgba(255,0,128,.5);
+    animation:shine 4s linear infinite;
+    font-size:1.8rem; padding:8px 12px;
+  }
+  @keyframes shine { 0%{background-position:0% 50%;} 100%{background-position:300% 50%;} }
+
+  .elem-empresa, .elem-servidor {
+    background:rgba(0,0,0,.65); border:1px solid rgba(255,255,255,.25);
+    border-radius:10px; padding:8px 14px; text-align:center;
+    backdrop-filter:blur(4px);
+  }
+  .elem-empresa small, .elem-servidor small {
+    font-size:.55rem; opacity:.8; display:block; letter-spacing:2px; }
+  .elem-empresa strong { font-size:.95rem; color:#ff0080; }
+  .elem-servidor strong { font-size:.95rem; color:#ff8c00; }
+
+  .elem-cats {
+    display:flex; flex-wrap:wrap; gap:6px; justify-content:center;
+    max-width:280px; padding:4px;
+  }
+  .elem-cats .cat-chip {
+    background:rgba(0,0,0,.7); border:1px solid #ff0080;
+    padding:5px 10px; border-radius:20px; font-size:.7rem;
+    font-weight:700; color:#fff;
+  }
+
+  .elem-wa {
+    display:flex; align-items:center; gap:8px;
+    background:rgba(0,0,0,.7); border:1px solid rgba(255,255,255,.2);
+    border-radius:30px; padding:8px 14px; backdrop-filter:blur(4px);
+  }
+  .elem-wa .wa-icon {
+    width:28px; height:28px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:1rem; font-weight:900; flex-shrink:0;
+  }
+  .elem-wa .wa-text small { font-size:.55rem; opacity:.8; display:block; letter-spacing:1px; }
+  .elem-wa .wa-text strong { font-size:.85rem; }
+
+  .elem-logo { background:transparent !important; padding:0 !important;
+               display:flex; align-items:center; justify-content:center; }
+  .elem-logo img { display:block; max-width:100%; max-height:100%;
+                   object-fit:contain; pointer-events:none; }
+
+  .elem-marca-texto {
+    font-weight:900; font-size:.75rem; letter-spacing:2px; color:#fff;
+    background:rgba(0,0,0,.5); padding:6px 12px; border-radius:8px;
+    white-space:nowrap;
+  }
+
+  /* ============ TEXTOS CHAMATIVOS ============ */
+  .elem-tag {
+    font-weight:900; text-transform:uppercase; letter-spacing:1.5px;
+    padding:8px 16px; border-radius:8px; white-space:nowrap;
+    font-size:1rem; text-align:center;
+    box-shadow:0 4px 15px rgba(0,0,0,.5);
+  }
+  .elem-tag.tag-adicionado {
+    background:linear-gradient(135deg,#00c853,#00e676);
+    color:#000; text-shadow:0 1px 2px rgba(255,255,255,.3);
+    border:2px solid #00ff9d;
+  }
+  .elem-tag.tag-lancamento {
+    background:linear-gradient(135deg,#ff3d00,#ff9100);
+    color:#fff; text-shadow:0 2px 4px rgba(0,0,0,.5);
+    border:2px solid #ffd700;
+    animation:pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,100% { transform:scale(1); box-shadow:0 4px 15px rgba(255,61,0,.5); }
+    50% { transform:scale(1.05); box-shadow:0 6px 25px rgba(255,145,0,.8); }
+  }
+  .elem-tag.tag-novo {
+    background:linear-gradient(135deg,#2196f3,#00bcd4);
+    color:#fff; border:2px solid #40e0d0;
+  }
+  .elem-tag.tag-exclusivo {
+    background:linear-gradient(135deg,#8a2be2,#ff1493);
+    color:#fff; border:2px solid #ffd700;
+    text-shadow:0 1px 3px rgba(0,0,0,.6);
+  }
+  .elem-tag.tag-breve {
+    background:linear-gradient(135deg,#ffd700,#ff8c00);
+    color:#000; border:2px solid #fff;
+  }
+  .elem-tag.tag-ultimos {
+    background:linear-gradient(135deg,#d32f2f,#ff0000);
+    color:#fff; border:2px solid #fff;
+    animation:pulseRed 1s ease-in-out infinite;
+  }
+  @keyframes pulseRed {
+    0%,100% { transform:scale(1); }
+    50% { transform:scale(1.08); }
+  }
+  .elem-tag.tag-assista {
+    background:linear-gradient(90deg,#ff0080,#ff8c00,#ffe600,#00ff9d,#00b3ff,#ff0080);
+    background-size:300% 100%;
+    animation:shine 3s linear infinite;
+    color:#000; font-weight:900; border:2px solid #fff;
+    text-shadow:0 1px 2px rgba(255,255,255,.5);
+  }
+
+  /* ============ CONTROLES ============ */
+  .controls {
+    background:rgba(255,255,255,.06); backdrop-filter:blur(20px);
+    border:1px solid rgba(255,255,255,.12); border-radius:20px;
+    padding:14px; max-height:88vh; overflow-y:auto;
+  }
+  .controls::-webkit-scrollbar { width:6px; }
+  .controls::-webkit-scrollbar-thumb { background:#ff0080; border-radius:3px; }
+
+  .section { margin-bottom:12px; padding-bottom:10px;
+             border-bottom:1px dashed rgba(255,255,255,.15); }
+  .section:last-child { border:none; margin:0; }
+  .section h3 { font-size:.78rem; color:#ff0080; margin-bottom:8px;
+                letter-spacing:1px; text-transform:uppercase; }
+  .section h3::before { content:'▸ '; }
+
+  label { font-size:.68rem; opacity:.85; display:block; margin:6px 0 4px; }
+  input[type=text], select {
+    width:100%; padding:8px 10px; border-radius:8px;
+    border:1px solid rgba(255,255,255,.2);
+    background:rgba(0,0,0,.4); color:#fff; font-size:.78rem; outline:none;
+  }
+  input:focus, select:focus { border-color:#ff0080; }
+
+  .btn-row { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
+  .btn { padding:8px 10px; border:none; border-radius:8px;
+         font-size:.7rem; font-weight:700; cursor:pointer;
+         transition:.2s; flex:1; min-width:65px; }
+  .btn-primary { background:linear-gradient(135deg,#ff0080,#ff8c00); color:#fff; }
+  .btn-secondary { background:rgba(255,255,255,.15); color:#fff; }
+  .btn-danger { background:rgba(255,0,60,.7); color:#fff; }
+  .btn:hover { transform:translateY(-1px); filter:brightness(1.15); }
+  .btn:active { transform:scale(.96); }
+
+  .formatos { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+  .fmt-btn { padding:7px 3px; border-radius:8px;
+             border:1px solid rgba(255,255,255,.2);
+             background:rgba(0,0,0,.3); color:#fff;
+             font-size:.6rem; cursor:pointer; text-align:center; }
+  .fmt-btn.active { background:#ff0080; border-color:#ff0080;
+                    color:#000; font-weight:800; }
+
+  .paleta { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+  .cor-swatch { width:28px; height:28px; border-radius:50%;
+                cursor:pointer; border:2px solid transparent; }
+  .cor-swatch.active { border-color:#fff; transform:scale(1.15); }
+
+  .cat-list { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+  .cat-item { background:#ff0080; color:#000;
+              padding:4px 10px; border-radius:15px;
+              font-size:.68rem; font-weight:700;
+              display:flex; align-items:center; gap:6px; }
+  .cat-item span { cursor:pointer; font-weight:900; }
+
+  .wa-grid { display:grid; grid-template-columns:repeat(4,1fr);
+             gap:6px; margin-top:6px; }
+  .wa-opt { aspect-ratio:1; border-radius:8px; border:2px solid transparent;
+            display:flex; align-items:center; justify-content:center;
+            font-size:1.1rem; font-weight:900; cursor:pointer; }
+  .wa-opt.active { border-color:#fff; transform:scale(1.1); }
+
+  .hidden-file { display:none; }
+  .pin-grid { display:grid; grid-template-columns:repeat(3,1fr);
+              gap:6px; margin-top:8px; }
+  .pin-grid img { width:100%; height:60px; object-fit:cover;
+                  border-radius:6px; cursor:pointer;
+                  border:2px solid transparent; }
+  .pin-grid img:hover { border-color:#ff0080; transform:scale(1.05); }
+
+  .download-btn { background:linear-gradient(135deg,#00c6ff,#0072ff);
+                  color:#fff; width:100%; padding:13px;
+                  border-radius:14px; font-weight:800;
+                  font-size:.88rem; margin-top:10px; border:none;
+                  cursor:pointer; box-shadow:0 8px 20px rgba(0,114,255,.4); }
+  .download-btn:active { transform:scale(.97); }
+
+  .hint { font-size:.62rem; opacity:.6; text-align:center;
+          margin-top:8px; font-style:italic; line-height:1.4; }
+
+  .modal-overlay {
+    position:fixed; inset:0; z-index:9999;
+    background:rgba(0,0,0,.92); display:flex;
+    flex-direction:column; align-items:center;
+    justify-content:center; padding:16px; gap:10px;
+    overflow:auto;
+  }
+</style>
+</head>
+<body>
+
+<h1>🎬 TV NOVA JUAREZ — Editor de Banner</h1>
+
+<div class="app">
+  <!-- ===== PALCO ===== -->
+  <div class="stage-wrap">
+    <div class="stage story" id="stage">
+      <img id="bannerBg" src="" alt="">
+      <div id="bannerOverlay"></div>
+    </div>
+    <div class="hint">Toque nos botões ➕ para adicionar elementos. Arraste para mover. Alça verde = redimensionar.</div>
+    <button class="download-btn" onclick="baixarBanner()">⬇️ BAIXAR BANNER (PNG)</button>
+  </div>
+
+  <!-- ===== CONTROLES ===== -->
+  <div class="controls">
+
+    <!-- FORMATOS -->
+    <div class="section">
+      <h3>📐 Formato</h3>
+      <div class="formatos" id="formatos">
+        <div class="fmt-btn active" data-fmt="story">Stories 9:16</div>
+        <div class="fmt-btn" data-fmt="square">Feed 1:1</div>
+        <div class="fmt-btn" data-fmt="yt">YouTube 16:9</div>
+        <div class="fmt-btn" data-fmt="wide">Wide 21:9</div>
+        <div class="fmt-btn" data-fmt="vertical">Vertical 4:5</div>
+      </div>
+    </div>
+
+    <!-- IMAGEM DE FUNDO -->
+    <div class="section">
+      <h3>🖼️ Imagem de Fundo</h3>
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="fileInput.click()">📁 Celular</button>
+        <button class="btn btn-secondary" onclick="togglePinterest()">📌 Pinterest</button>
+      </div>
+      <input type="file" id="fileInput" accept="image/*" class="hidden-file" onchange="loadFile(event)">
+      <div id="pinterestBox" style="display:none;margin-top:8px">
+        <input type="text" id="pinSearch" placeholder="Ex: filme, anime, capoeira..."
+               onkeydown="if(event.key==='Enter')buscarPinterest()">
+        <button class="btn btn-primary" style="margin-top:6px;width:100%" onclick="buscarPinterest()">🔍 Buscar</button>
+        <div class="pin-grid" id="pinGrid"></div>
+      </div>
+    </div>
+
+    <!-- ADICIONAR ELEMENTOS -->
+    <div class="section">
+      <h3>➕ Adicionar Elementos</h3>
+      
+      <label style="margin-top:4px">🏢 Básicos</label>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="addEmpresa()">🏢 Empresa</button>
+        <button class="btn btn-primary" onclick="addServidor()">🖥️ Servidor</button>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="addNome()">⭐ Nome TV</button>
+        <button class="btn btn-primary" onclick="addCategorias()">🏷️ Categorias</button>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="addWhatsApp()">📱 WhatsApp</button>
+      </div>
+
+      <label style="margin-top:8px">✨ Textos Chamativos</label>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="addAdicionado()">✅ Adicionado</button>
+        <button class="btn btn-primary" onclick="addLancamento()">🔥 Lançamento</button>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="addNovo()">🆕 Novo</button>
+        <button class="btn btn-primary" onclick="addExclusivo()">⭐ Exclusivo</button>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="addEmBreve()">⏰ Em Breve</button>
+        <button class="btn btn-primary" onclick="addUltimos()">🚨 Últimos</button>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="addAssista()">🎬 Assista Agora</button>
+      </div>
+
+      <label style="margin-top:8px">🖼️ Logos e Marcas</label>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="logoInput.click()">🖼️ Logo (auto-fundo)</button>
+        <button class="btn btn-secondary" onclick="logoInput2.click()">✂️ Logo (ajuste)</button>
+      </div>
+      <input type="file" id="logoInput" accept="image/*" class="hidden-file" onchange="loadLogoAuto(event)">
+      <input type="file" id="logoInput2" accept="image/*" class="hidden-file" onchange="loadLogoAjuste(event)">
+      <div class="btn-row" style="margin-top:6px">
+        <button class="btn btn-secondary" onclick="addLogoTexto()">✏️ Marca texto</button>
+        <button class="btn btn-secondary" onclick="espalharLogos()">✨ Espalhar</button>
+      </div>
+
+      <label style="margin-top:8px">🗑️ Ações</label>
+      <div class="btn-row">
+        <button class="btn btn-danger" onclick="limparSelecionado()">🗑️ Apagar sel.</button>
+        <button class="btn btn-danger" onclick="limparTudo()">🧹 Limpar tudo</button>
+      </div>
+    </div>
+
+    <!-- CONFIG TEXTOS -->
+    <div class="section">
+      <h3>🏢 Textos</h3>
+      <label>Empresa</label>
+      <input type="text" id="inEmpresa" value="TV NOVA JUAREZ" oninput="atualizarTexto('empresa')">
+      <label>Servidor</label>
+      <input type="text" id="inServidor" value="SERVER 01" oninput="atualizarTexto('servidor')">
+      <label>Nome Personalizado</label>
+      <input type="text" id="inNome" value="TV NOVA JUAREZ" oninput="atualizarTexto('nome')">
+    </div>
+
+    <!-- CATEGORIAS -->
+    <div class="section">
+      <h3>🏷️ Categorias</h3>
+      <div class="btn-row">
+        <input type="text" id="inCat" placeholder="Filmes, Séries..."
+               onkeydown="if(event.key==='Enter')addCat()">
+        <button class="btn btn-primary" style="flex:0 0 55px" onclick="addCat()">+</button>
+      </div>
+      <div class="cat-list" id="catList"></div>
+    </div>
+
+    <!-- WHATSAPP -->
+    <div class="section">
+      <h3>📱 WhatsApp</h3>
+      <label>Contato</label>
+      <input type="text" id="inWa" value="(00) 00000-0000" oninput="atualizarTexto('wa')">
+      <label>Ícone / Cor</label>
+      <div class="wa-grid" id="waGrid"></div>
+    </div>
+
+    <!-- CORES -->
+    <div class="section">
+      <h3>🎨 Destaque</h3>
+      <div class="paleta" id="paleta"></div>
+    </div>
+
+    <!-- ELEMENTO SELECIONADO -->
+    <div class="section" id="selSection" style="display:none">
+      <h3>⚙️ Elemento Selecionado</h3>
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="escalaSel(1.15)">➕ Aumentar</button>
+        <button class="btn btn-secondary" onclick="escalaSel(0.87)">➖ Diminuir</button>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="rotacionarSel(-15)">↺ Girar</button>
+        <button class="btn btn-secondary" onclick="rotacionarSel(15)">↻ Girar</button>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="alinharSel('left')">⬅</button>
+        <button class="btn btn-secondary" onclick="alinharSel('center')">↔</button>
+        <button class="btn btn-secondary" onclick="alinharSel('right')">➡</button>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="alinharSel('top')">⬆</button>
+        <button class="btn btn-secondary" onclick="alinharSel('middle')">↕</button>
+        <button class="btn btn-secondary" onclick="alinharSel('bottom')">⬇</button>
+      </div>
+      <div class="btn-row" id="btnFundoLogo" style="display:none;margin-top:6px">
+        <button class="btn btn-secondary" onclick="removerFundoSelecionado()">✂️ Remover fundo</button>
+      </div>
+      <div class="btn-row" style="margin-top:6px">
+        <button class="btn btn-danger" onclick="limparSelecionado()">🗑️ Apagar</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ============ ESTADO ============ */
+const state = {
+  formato: 'story',
+  empresa: 'TV NOVA JUAREZ',
+  servidor: 'SERVER 01',
+  nome: 'TV NOVA JUAREZ',
+  wa: '(00) 00000-0000',
+  waIcone: { emoji:'📱', cor:'#25D366' },
+  categorias: ['Filmes','Séries','Desenhos','Capoeira'],
+  accent: '#ff0080',
+  imagem: '',
+  selecionado: null,
+  contador: 0
+};
+
+/* ============ FORMATOS ============ */
+document.querySelectorAll('.fmt-btn').forEach(b=>{
+  b.onclick = ()=>{
+    document.querySelectorAll('.fmt-btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    state.formato = b.dataset.fmt;
+    document.getElementById('stage').className = 'stage ' + state.formato;
+  };
+});
+
+/* ============ IMAGEM FUNDO ============ */
+function loadFile(e){
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = ev => {
+    state.imagem = ev.target.result;
+    bannerBg.src = state.imagem;
+    bannerBg.classList.add('show');
+  };
+  r.readAsDataURL(f);
+}
+function togglePinterest(){
+  const box = document.getElementById('pinterestBox');
+  box.style.display = box.style.display === 'none' ? 'block' : 'none';
+}
+function buscarPinterest(){
+  const q = pinSearch.value.trim(); if(!q) return;
+  const temas = {
+    'filme':'action-movie','série':'tv-series','serie':'tv-series',
+    'anime':'anime','desenho':'cartoon','capoeira':'capoeira',
+    'ação':'action','acao':'action','drama':'drama','comédia':'comedy',
+    'comedia':'comedy','terror':'horror','futebol':'soccer',
+    'natureza':'nature','netflix':'cinema'
+  };
+  const t = Object.keys(temas).find(k=>q.toLowerCase().includes(k));
+  const seed = t ? temas[t] : 'cinema';
+  pinGrid.innerHTML = '';
+  for(let i=1;i<=6;i++){
+    const img = document.createElement('img');
+    img.src = `https://picsum.photos/seed/${seed}${i}/300/300`;
+    img.crossOrigin = 'anonymous';
+    img.onclick = ()=> {
+      state.imagem = img.src;
+      bannerBg.src = img.src;
+      bannerBg.crossOrigin = 'anonymous';
+      bannerBg.classList.add('show');
+    };
+    pinGrid.appendChild(img);
+  }
+}
+
+/* ============ DRAG & RESIZE ============ */
+function tornarArrastavel(el){
+  let startX, startY, startL, startT, dragging = false;
+
+  el.addEventListener('pointerdown', e=>{
+    if(e.target.classList.contains('resize-handle')) return;
+    e.stopPropagation();
+    selecionar(el);
+    dragging = true;
+    startX = e.clientX; startY = e.clientY;
+    startL = parseInt(el.style.left) || 0;
+    startT = parseInt(el.style.top) || 0;
+    try{ el.setPointerCapture(e.pointerId); }catch(_){}
+  });
+  el.addEventListener('pointermove', e=>{
+    if(!dragging) return;
+    el.style.left = (startL + e.clientX - startX) + 'px';
+    el.style.top  = (startT + e.clientY - startY) + 'px';
+  });
+  el.addEventListener('pointerup', e=>{
+    dragging = false;
+    try{ el.releasePointerCapture(e.pointerId); }catch(_){}
+  });
+  el.addEventListener('pointercancel', ()=>{ dragging = false; });
+
+  const handle = el.querySelector('.resize-handle');
+  if(handle){
+    let rs = false, rSX, rSY, rW, rH;
+    handle.addEventListener('pointerdown', e=>{
+      e.stopPropagation(); rs = true;
+      rSX = e.clientX; rSY = e.clientY;
+      rW = el.offsetWidth; rH = el.offsetHeight;
+      try{ handle.setPointerCapture(e.pointerId); }catch(_){}
+    });
+    handle.addEventListener('pointermove', e=>{
+      if(!rs) return;
+      const nw = Math.max(40, rW + (e.clientX - rSX));
+      const nh = Math.max(30, rH + (e.clientY - rSY));
+      el.style.width = nw + 'px';
+      el.style.height = nh + 'px';
+    });
+    handle.addEventListener('pointerup', ()=>{ rs = false; });
+  }
+}
+
+function selecionar(el){
+  document.querySelectorAll('.elem').forEach(x=>x.classList.remove('selected'));
+  el.classList.add('selected');
+  state.selecionado = el;
+  document.getElementById('selSection').style.display = 'block';
+  if(el.dataset.tipo === 'logo'){
+    document.getElementById('btnFundoLogo').style.display = 'flex';
+  } else {
+    document.getElementById('btnFundoLogo').style.display = 'none';
+  }
+}
+
+document.getElementById('stage').addEventListener('pointerdown', ()=>{
+  document.querySelectorAll('.elem').forEach(x=>x.classList.remove('selected'));
+  state.selecionado = null;
+  document.getElementById('selSection').style.display = 'none';
+});
+
+/* ============ CRIAR ELEMENTO ============ */
+function criarElemento(html, classe, w, h){
+  const el = document.createElement('div');
+  el.className = 'elem ' + (classe || '');
+  el.innerHTML = html + '<div class="resize-handle"></div>';
+  el.style.left = '20px';
+  el.style.top  = (20 + (state.contador % 8) * 50) + 'px';
+  if(w) el.style.width = w + 'px';
+  if(h) el.style.height = h + 'px';
+  document.getElementById('stage').appendChild(el);
+  tornarArrastavel(el);
+  selecionar(el);
+  state.contador++;
+  return el;
+}
+
+/* ============ ADICIONAR ELEMENTOS BÁSICOS ============ */
+function addEmpresa(){
+  const el = criarElemento(
+    `<div class="elem-empresa"><small>EMPRESA</small><strong>${state.empresa}</strong></div>`
+  );
+  el.dataset.tipo = 'empresa';
+}
+function addServidor(){
+  const el = criarElemento(
+    `<div class="elem-servidor"><small>SERVIDOR</small><strong>${state.servidor}</strong></div>`
+  );
+  el.dataset.tipo = 'servidor';
+}
+function addNome(){
+  const el = criarElemento(`<div class="elem-nome">${state.nome}</div>`);
+  el.dataset.tipo = 'nome';
+}
+function addCategorias(){
+  const chips = state.categorias.map(c=>`<div class="cat-chip">${c}</div>`).join('');
+  const el = criarElemento(`<div class="elem-cats">${chips}</div>`);
+  el.dataset.tipo = 'categorias';
+}
+function addWhatsApp(){
+  const icone = state.waIcone;
+  const el = criarElemento(
+    `<div class="elem-wa">
+      <div class="wa-icon" style="background:${icone.cor};color:#000">${icone.emoji}</div>
+      <div class="wa-text"><small>ATENDIMENTO WHATSAPP</small><strong>${state.wa}</strong></div>
+    </div>`
+  );
+  el.dataset.tipo = 'wa';
+}
+function addLogoTexto(){
+  const el = criarElemento(
+    `<div class="elem-marca-texto">${state.nome}</div>`
+  );
+  el.dataset.tipo = 'marca';
+}
+
+/* ============ TEXTOS CHAMATIVOS ============ */
+function addAdicionado(){
+  const el = criarElemento(
+    `<div class="elem-tag tag-adicionado">ADICIONADO NA ${state.nome}</div>`
+  );
+  el.dataset.tipo = 'adicionado';
+}
+function addLancamento(){
+  const el = criarElemento(
+    `<div class="elem-tag tag-lancamento">🔥 LANÇAMENTO NA ${state.nome} 🔥</div>`
+  );
+  el.dataset.tipo = 'lancamento';
+}
+function addNovo(){
+  const el = criarElemento(
+    `<div class="elem-tag tag-novo">🆕 NOVO NA ${state.nome}</div>`
+  );
+  el.dataset.tipo = 'novo';
+}
+function addExclusivo(){
+  const el = criarElemento(
+    `<div class="elem-tag tag-exclusivo">⭐ EXCLUSIVO ${state.nome} ⭐</div>`
+  );
+  el.dataset.tipo = 'exclusivo';
+}
+function addEmBreve(){
+  const el = criarElemento(
+    `<div class="elem-tag tag-breve">⏰ EM BREVE NA ${state.nome}</div>`
+  );
+  el.dataset.tipo = 'breve';
+}
+function addUltimos(){
+  const el = criarElemento(
+    `<div class="elem-tag tag-ultimos">🚨 ÚLTIMOS DIAS NA ${state.nome} 🚨</div>`
+  );
+  el.dataset.tipo = 'ultimos';
+}
+function addAssista(){
+  const el = criarElemento(
+    `<div class="elem-tag tag-assista">🎬 ASSISTA AGORA NA ${state.nome} 🎬</div>`
+  );
+  el.dataset.tipo = 'assista';
+}
+
+/* ============ REMOVER FUNDO ============ */
+function removerFundoBranco(img, tolerance = 235){
+  const canvas = document.createElement('canvas');
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0);
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imgData.data;
+
+  for(let i = 0; i < data.length; i += 4){
+    const r = data[i], g = data[i+1], b = data[i+2], a = data[i+3];
+    if(a < 10) continue;
+    if(r > tolerance && g > tolerance && b > tolerance){
+      data[i+3] = 0;
+      continue;
+    }
+    const max = Math.max(r,g,b), min = Math.min(r,g,b);
+    if((max - min) < 25 && r > 200 && g > 200 && b > 200){
+      data[i+3] = 0;
+      continue;
+    }
+    if(r > 200 && g > 200 && b > 200){
+      const brilho = (r + g + b) / 3;
+      const fade = Math.max(0, 1 - (brilho - 200) / 55);
+      data[i+3] = Math.round(a * fade);
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+  return canvas.toDataURL('image/png');
+}
+
+/* ============ LOGO AUTO ============ */
+function loadLogoAuto(e){
+  const f = e.target.files[0]; if(!f) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      let processed;
+      try { processed = removerFundoBranco(img, 235); }
+      catch(err){ processed = ev.target.result; }
+      criarLogoNoPalco(processed);
+      e.target.value = '';
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(f);
+}
+
+/* ============ LOGO COM AJUSTE ============ */
+function loadLogoAjuste(e){
+  const f = e.target.files[0]; if(!f) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      abrirAjusteFundo(ev.target.result, img);
+      e.target.value = '';
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(f);
+}
+
+/* ============ MODAL AJUSTE ============ */
+function abrirAjusteFundo(dataUrl, img){
+  const modal = document.createElement('div');
+  modal.id = 'modalFundo';
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+    <h3 style="color:#fff;font-size:.95rem">✂️ Ajustar remoção de fundo</h3>
+    <div style="background:
+      repeating-conic-gradient(#444 0% 25%, #222 0% 50%) 50% / 16px 16px;
+      border-radius:12px; padding:8px; max-width:92vw;">
+      <canvas id="canvasAjuste" style="max-width:100%;max-height:45vh;display:block"></canvas>
+    </div>
+    <div style="width:100%;max-width:320px">
+      <label style="color:#fff;font-size:.72rem;display:block;margin-bottom:4px">
+        Intensidade: <span id="tolVal" style="color:#00ff9d">235</span>
+      </label>
+      <input type="range" id="tolRange" min="150" max="255" value="235"
+        style="width:100%" oninput="recalcularFundo()">
+    </div>
+    <div style="display:flex;gap:8px;width:100%;max-width:320px">
+      <button onclick="aplicarAjusteFundo()"
+        style="flex:1;padding:12px;border:none;border-radius:10px;
+        background:linear-gradient(135deg,#00c6ff,#0072ff);color:#fff;
+        font-weight:800;cursor:pointer">✓ Aplicar</button>
+      <button onclick="cancelarAjusteFundo()"
+        style="flex:1;padding:12px;border:none;border-radius:10px;
+        background:rgba(255,255,255,.15);color:#fff;
+        font-weight:800;cursor:pointer">✕ Cancelar</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  window._ajuste = { img, dataUrl, resultado: null };
+  recalcularFundo();
+}
+
+function recalcularFundo(){
+  if(!window._ajuste) return;
+  const { img } = window._ajuste;
+  const tol = parseInt(document.getElementById('tolRange').value);
+  document.getElementById('tolVal').textContent = tol;
+  const resultado = removerFundoBranco(img, tol);
+  window._ajuste.resultado = resultado;
+
+  const canvas = document.getElementById('canvasAjuste');
+  const ctx = canvas.getContext('2d');
+  const novaImg = new Image();
+  novaImg.onload = () => {
+    const maxW = 320, maxH = window.innerHeight * 0.42;
+    let w = novaImg.width, h = novaImg.height;
+    if(w > maxW){ h = h * maxW / w; w = maxW; }
+    if(h > maxH){ w = w * maxH / h; h = maxH; }
+    canvas.width = w; canvas.height = h;
+    ctx.clearRect(0,0,w,h);
+    ctx.drawImage(novaImg, 0, 0, w, h);
+  };
+  novaImg.src = resultado;
+}
+
+function aplicarAjusteFundo(){
+  if(window._ajuste && window._ajuste.resultado){
+    criarLogoNoPalco(window._ajuste.resultado);
+  }
+  cancelarAjusteFundo();
+}
+function cancelarAjusteFundo(){
+  const m = document.getElementById('modalFundo');
+  if(m) m.remove();
+  window._ajuste = null;
+}
+
+/* ============ CRIAR LOGO NO PALCO ============ */
+function criarLogoNoPalco(dataUrl){
+  const el = criarElemento(
+    `<div class="elem-logo">
+       <img src="${dataUrl}" style="max-width:120px;max-height:120px;display:block">
+     </div>`, 'elem-logo-wrap', 130, 130
+  );
+  el.dataset.tipo = 'logo';
+  el.style.background = 'transparent';
+  el.style.border = 'none';
+  el.style.padding = '0';
+}
+
+/* ============ REMOVER FUNDO DA LOGO SELECIONADA ============ */
+function removerFundoSelecionado(){
+  const el = state.selecionado;
+  if(!el || el.dataset.tipo !== 'logo') return;
+  const img = el.querySelector('img');
+  if(!img) return;
+  const novaImg = new Image();
+  novaImg.crossOrigin = 'anonymous';
+  novaImg.onload = () => {
+    try {
+      const processada = removerFundoBranco(novaImg, 235);
+      img.src = processada;
+    } catch(e){ alert('Não foi possível remover o fundo.'); }
+  };
+  novaImg.src = img.src;
+}
+
+/* ============ ESPALHAR LOGOS ============ */
+function espalharLogos(){
+  const text = prompt("Texto da marca d'água:", state.nome);
+  if(!text) return;
+  const qtd = Math.min(30, parseInt(prompt('Quantas marcas espalhar? (1-30)', '12')) || 12);
+  const w = document.getElementById('stage').offsetWidth;
+  const h = document.getElementById('stage').offsetHeight;
+  for(let i=0; i<qtd; i++){
+    const el = document.createElement('div');
+    el.className = 'elem';
+    el.dataset.tipo = 'marca';
+    el.innerHTML = `
+      <div style="font-weight:900;font-size:.6rem;letter-spacing:1px;
+        color:rgba(255,255,255,.55);white-space:nowrap;">${text}</div>
+      <div class="resize-handle"></div>`;
+    el.style.left = Math.random() * (w - 100) + 'px';
+    el.style.top  = Math.random() * (h - 30) + 'px';
+    el.style.opacity = 0.55;
+    document.getElementById('stage').appendChild(el);
+    tornarArrastavel(el);
+  }
+}
+
+/* ============ CONTROLES SELECIONADO ============ */
+function escalaSel(fator){
+  const el = state.selecionado; if(!el) return;
+  const w = el.offsetWidth, h = el.offsetHeight;
+  el.style.width = (w * fator) + 'px';
+  el.style.height = (h * fator) + 'px';
+  const fs = parseFloat(getComputedStyle(el).fontSize) || 16;
+  el.style.fontSize = (fs * fator) + 'px';
+}
+function rotacionarSel(graus){
+  const el = state.selecionado; if(!el) return;
+  const atual = parseFloat(el.dataset.rot || 0);
+  const novo = atual + graus;
+  el.dataset.rot = novo;
+  el.style.transform = `rotate(${novo}deg)`;
+}
+function alinharSel(pos){
+  const el = state.selecionado; if(!el) return;
+  const stage = document.getElementById('stage');
+  const w = stage.offsetWidth, h = stage.offsetHeight;
+  const ew = el.offsetWidth, eh = el.offsetHeight;
+  if(pos==='left')   el.style.left = '8px';
+  if(pos==='right')  el.style.left = (w - ew - 8) + 'px';
+  if(pos==='center') el.style.left = ((w - ew)/2) + 'px';
+  if(pos==='top')    el.style.top = '8px';
+  if(pos==='bottom') el.style.top = (h - eh - 8) + 'px';
+  if(pos==='middle') el.style.top = ((h - eh)/2) + 'px';
+}
+
+function limparSelecionado(){
+  if(state.selecionado){ state.selecionado.remove(); state.selecionado = null; }
+  document.getElementById('selSection').style.display = 'none';
+}
+function limparTudo(){
+  if(!confirm('Apagar todos os elementos?')) return;
+  document.querySelectorAll('.elem').forEach(x=>x.remove());
+  state.selecionado = null;
+  document.getElementById('selSection').style.display = 'none';
+  state.contador = 0;
+}
+
+/* ============ ATUALIZAR TEXTOS ============ */
+function atualizarTexto(tipo){
+  if(tipo==='empresa'){
+    state.empresa = inEmpresa.value;
+    document.querySelectorAll('[data-tipo="empresa"] strong').forEach(x=>x.textContent = state.empresa);
+  }
+  if(tipo==='servidor'){
+    state.servidor = inServidor.value;
+    document.querySelectorAll('[data-tipo="servidor"] strong').forEach(x=>x.textContent = state.servidor);
+  }
+  if(tipo==='nome'){
+    state.nome = inNome.value;
+    // Atualiza todos os elementos que usam o nome
+    document.querySelectorAll('[data-tipo="nome"] .elem-nome').forEach(x=>x.textContent = state.nome);
+    document.querySelectorAll('[data-tipo="marca"] .elem-marca-texto').forEach(x=>x.textContent = state.nome);
+    document.querySelectorAll('[data-tipo="adicionado"] .elem-tag').forEach(x=>x.textContent = `ADICIONADO NA ${state.nome}`);
+    document.querySelectorAll('[data-tipo="lancamento"] .elem-tag').forEach(x=>x.textContent = `🔥 LANÇAMENTO NA ${state.nome} 🔥`);
+    document.querySelectorAll('[data-tipo="novo"] .elem-tag').forEach(x=>x.textContent = `🆕 NOVO NA ${state.nome}`);
+    document.querySelectorAll('[data-tipo="exclusivo"] .elem-tag').forEach(x=>x.textContent = `⭐ EXCLUSIVO ${state.nome} ⭐`);
+    document.querySelectorAll('[data-tipo="breve"] .elem-tag').forEach(x=>x.textContent = `⏰ EM BREVE NA ${state.nome}`);
+    document.querySelectorAll('[data-tipo="ultimos"] .elem-tag').forEach(x=>x.textContent = `🚨 ÚLTIMOS DIAS NA ${state.nome} 🚨`);
+    document.querySelectorAll('[data-tipo="assista"] .elem-tag').forEach(x=>x.textContent = `🎬 ASSISTA AGORA NA ${state.nome} 🎬`);
+  }
+  if(tipo==='wa'){
+    state.wa = inWa.value;
+    document.querySelectorAll('[data-tipo="wa"] .wa-text strong').forEach(x=>x.textContent = state.wa);
+  }
+}
+
+/* ============ CATEGORIAS ============ */
+function addCat(){
+  const v = inCat.value.trim(); if(!v) return;
+  if(!state.categorias.includes(v)) state.categorias.push(v);
+  inCat.value = '';
+  renderCats();
+}
+function removeCat(c){
+  state.categorias = state.categorias.filter(x=>x!==c);
+  renderCats();
+}
+function renderCats(){
+  catList.innerHTML = state.categorias.map(c=>
+    `<div class="cat-item">${c}<span onclick="removeCat('${c}')">×</span></div>`).join('');
+  const chips = state.categorias.map(c=>`<div class="cat-chip">${c}</div>`).join('');
+  document.querySelectorAll('[data-tipo="categorias"] .elem-cats').forEach(x=>x.innerHTML = chips);
+}
+
+/* ============ WHATSAPP ============ */
+const waOpcoes = [
+  { emoji:'📱', cor:'#25D366' },
+  { emoji:'💬', cor:'#00A884' },
+  { emoji:'📞', cor:'#128C7E' },
+  { emoji:'✅', cor:'#34B7F1' },
+  { emoji:'🔥', cor:'#FF4500' },
+  { emoji:'⚡', cor:'#FFD700' },
+  { emoji:'💚', cor:'#00FF7F' },
+  { emoji:'🎯', cor:'#FF1493' }
+];
+function renderWaOpts(){
+  waGrid.innerHTML = waOpcoes.map((o,i)=>
+    `<div class="wa-opt ${state.waIcone.emoji===o.emoji?'active':''}"
+      style="background:${o.cor};color:#000"
+      onclick="setWaIcon(${i})">${o.emoji}</div>`).join('');
+}
+function setWaIcon(i){
+  state.waIcone = waOpcoes[i];
+  document.querySelectorAll('[data-tipo="wa"] .wa-icon').forEach(x=>{
+    x.textContent = state.waIcone.emoji;
+    x.style.background = state.waIcone.cor;
+  });
+  renderWaOpts();
+}
+
+/* ============ PALETA ============ */
+const cores = ['#ff0080','#ff8c00','#ffe600','#00ff9d','#00b3ff','#8a2be2',
+               '#ff4500','#00ced1','#ff1493','#7fff00','#ff6347','#40e0d0'];
+function renderPaleta(){
+  paleta.innerHTML = cores.map(c=>
+    `<div class="cor-swatch ${state.accent===c?'active':''}"
+      style="background:${c}" onclick="setAccent('${c}')"></div>`).join('');
+}
+function setAccent(c){
+  state.accent = c;
+  document.querySelectorAll('.cat-chip').forEach(x=>x.style.borderColor = c);
+  document.querySelectorAll('.elem-empresa strong').forEach(x=>x.style.color = c);
+  renderPaleta();
+}
+
+/* ============ DOWNLOAD ============ */
+function baixarBanner(){
+  const sel = state.selecionado;
+  document.querySelectorAll('.elem').forEach(x=>x.classList.remove('selected'));
+
+  const stageEl = document.getElementById('stage');
+  html2canvas(stageEl, {
+    width: stageEl.offsetWidth,
+    height: stageEl.offsetHeight,
+    scale: 3,
+    useCORS: true,
+    allowTaint: true,
+    backgroundColor: null
+  }).then(canvas=>{
+    const link = document.createElement('a');
+    link.download = `TVNOVAJUAREZ-${state.formato}-${Date.now()}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    if(sel) selecionar(sel);
+  }).catch(err=>{
+    alert('Erro ao gerar. Tente outro navegador.');
+    console.error(err);
+  });
+}
+
+/* ============ INIT ============ */
+function init(){
+  renderCats();
+  renderWaOpts();
+  renderPaleta();
+}
+init();
+</script>
+</body>
+</html>
